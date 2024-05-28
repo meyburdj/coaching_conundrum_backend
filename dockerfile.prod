@@ -1,0 +1,33 @@
+# pull official base image
+FROM python:3.12.0-slim-bookworm
+
+# set working directory
+WORKDIR /usr/src/app
+
+# set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV FLASK_DEBUG 0
+ENV FLASK_ENV production
+ENV APP_SETTINGS src.config.Config
+ENV PATH /home/root/.local/bin:$PATH
+
+# install system dependencies
+RUN apt-get update \
+    && apt-get -y install netcat-openbsd gcc \
+    && apt-get clean
+
+# add and install requirements
+COPY ./requirements.txt .
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+# add app
+COPY . .
+
+# add and run as non-root user
+RUN adduser --disabled-password --gecos '' myuser
+USER myuser
+
+# run gunicorn
+CMD gunicorn --workers 4 --threads 4 --bind 0.0.0.0:$PORT --timeout 180 manage:app
