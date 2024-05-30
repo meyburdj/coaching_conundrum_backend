@@ -2,9 +2,12 @@ from src import db
 from sqlalchemy.exc import IntegrityError
 from .models import Appointment, AppointmentReview
 from datetime import datetime
+from src.api.users.models import User
+
 
 def create_appointment(coach_id, start_time):
     try:
+        #TODO: Add check to make sure time slot is available
         appointment = Appointment(coach_id=coach_id, start_time=start_time)
         db.session.add(appointment)
         db.session.commit()
@@ -21,7 +24,13 @@ def read_appointment(appointment_id):
 
 def read_appointments(selected_time=None, available=None):
     try:
-        query = Appointment.query
+        query = db.session.query(
+            Appointment.id,
+            Appointment.coach_id,
+            User.name.label('coach_name'),
+            Appointment.start_time,
+            Appointment.student_id
+        ).join(User, User.id == Appointment.coach_id)
 
         if selected_time:
             try:
@@ -47,6 +56,7 @@ def update_appointment(appointment_id, student_id):
     try:
         appointment = Appointment.query.filter(Appointment.id == appointment_id).first()
         if appointment:
+            #TODO: check to make sure appointment.student_id = null before updating
             appointment.student_id = student_id
             db.session.commit()
             return appointment
