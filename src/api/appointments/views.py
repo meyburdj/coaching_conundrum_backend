@@ -5,6 +5,7 @@ from .crud import (
     create_appointment_review, read_appointments_by_coach, read_appointments_by_student
 )
 
+
 appointments_namespace = Namespace('appointments')
 
 appointment_review_model = appointments_namespace.model('AppointmentReview', {
@@ -17,10 +18,12 @@ appointment_review_model = appointments_namespace.model('AppointmentReview', {
 appointment_model = appointments_namespace.model('Appointment', {
     'id': fields.Integer(readOnly=True),
     'coach_id': fields.Integer(required=True, description='ID of the coach'),
+    'coach_name': fields.String(readOnly=True, description='Name of the coach'),
     'start_time': fields.DateTime(required=True, description='Start time of the appointment'),
     'student_id': fields.Integer(description='ID of the student'),
     'review': fields.Nested(appointment_review_model, required=False)
 })
+
 
 class AppointmentResource(Resource):
     @appointments_namespace.marshal_with(appointment_model)
@@ -67,10 +70,10 @@ class AppointmentList(Resource):
             if available is not None:
                 available = available.lower() == 'true'
             appointments = read_appointments(selected_time, available)
-            if appointments:
-                return appointments, 200
-            else:
-                appointments_namespace.abort(404, "No appointments found")
+            # if appointments:
+            return appointments, 200
+            # else:
+            #     appointments_namespace.abort(404, "No appointments found")
         except ValueError as e:
             appointments_namespace.abort(500, str(e))
 
