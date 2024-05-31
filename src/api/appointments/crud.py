@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from .models import Appointment, AppointmentReview
 from datetime import datetime
 from src.api.users.models import User
+from sqlalchemy import and_
 
 
 def create_appointment(coach_id, start_time):
@@ -44,7 +45,8 @@ def read_appointments(selected_time=None, available=None):
 
         if available is not None:
             if available:
-                query = query.filter(Appointment.student_id.is_(None))
+                print("datetime.now()", datetime.now())
+                query = query.filter(and_(Appointment.student_id.is_(None), Appointment.start_time > datetime.now()))
             else:
                 query = query.filter(Appointment.student_id.isnot(None))
 
@@ -56,10 +58,22 @@ def update_appointment(appointment_id, student_id):
     try:
         appointment = Appointment.query.filter(Appointment.id == appointment_id).first()
         if appointment:
-            #TODO: check to make sure appointment.student_id = null before updating
+            if appointment.student_id is not None:
+                raise ValueError("Appointment is already booked.")
+
             appointment.student_id = student_id
             db.session.commit()
-            return appointment
+            updated_appointment = db.session.query(
+                Appointment.id,
+                Appointment.coach_id,
+                User.name.label('coach_name'),
+                User.phone_number,
+                Appointment.start_time,
+                Appointment.student_id
+            ).join(User, User.id == Appointment.coach_id).filter(Appointment.id == appointment_id).first()
+
+            return updated_appointment
+            # return appointment
         else:
             raise ValueError(f"Appointment with id {appointment_id} not found.")
     except Exception as e:
@@ -112,6 +126,13 @@ def read_appointments_by_coach(coach_id):
 
 def read_appointments_by_student(student_id):
     try:
-        return db.session.query(Appointment).filter(Appointment.student_id == student_id).all()
+        return db.session.query(
+            Appointment.id,
+            Appointment.coach_id,
+            User.name.label('coach_name'),
+            User.phone_number,
+            Appointment.start_time,
+            Appointment.student_id
+        ).join(User, User.id == Appointment.coach_id).filter(and_(Appointment.student_id == student_id, Appointment.start_time > datetime.now())).order_by(Appointment.start_time).all()
     except Exception as e:
         raise ValueError(f"Error reading appointments for student {student_id}: {e}")
