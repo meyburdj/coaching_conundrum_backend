@@ -23,6 +23,9 @@ class User(db.Model):
         db.String(10), 
         nullable=False)
 
+    coached_appointments = db.relationship('Appointment', foreign_keys='Appointment.coach_id', backref='coach')
+    student_appointments = db.relationship('Appointment', foreign_keys='Appointment.student_id', backref='student')
+    
     def __init__(self, name, phone_number, role):
         self.name=name
         self.phone_number=phone_number
