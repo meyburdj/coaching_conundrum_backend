@@ -52,6 +52,8 @@ class AppointmentReview(db.Model):
         db.Text, 
         nullable=False
         )
+    
+    appointment = db.relationship('Appointment', backref='reviews')
 
     def __init__(self, appointment_id, satisfaction_score, notes):
         self.appointment_id = appointment_id
