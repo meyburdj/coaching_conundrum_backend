@@ -22,6 +22,7 @@ appointment_model = appointments_namespace.model('Appointment', {
     'phone_number': fields.String(readOnly=True, description='Phone number of the coach'),
     'start_time': fields.DateTime(required=True, description='Start time of the appointment'),
     'student_id': fields.Integer(description='ID of the student'),
+    'student_name': fields.String(readOnly=True, description='Name of the student'),
     'review': fields.Nested(appointment_review_model, required=False)
 })
 
@@ -71,10 +72,7 @@ class AppointmentList(Resource):
             if available is not None:
                 available = available.lower() == 'true'
             appointments = read_appointments(selected_time, available)
-            # if appointments:
             return appointments, 200
-            # else:
-            #     appointments_namespace.abort(404, "No appointments found")
         except ValueError as e:
             appointments_namespace.abort(500, str(e))
 
@@ -116,10 +114,7 @@ class CoachAppointments(Resource):
     def get(self, coach_id):
         try:
             appointments = read_appointments_by_coach(coach_id)
-            if appointments:
-                return appointments, 200
-            else:
-                appointments_namespace.abort(404, f"No appointments found for coach with id {coach_id}")
+            return appointments, 200
         except ValueError as e:
             appointments_namespace.abort(500, str(e))
 
