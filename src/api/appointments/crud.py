@@ -4,6 +4,8 @@ from .models import Appointment, AppointmentReview
 from datetime import datetime
 from src.api.users.models import User
 from sqlalchemy import and_
+from sqlalchemy import func
+from sqlalchemy.orm import aliased
 
 
 def create_appointment(coach_id, start_time):
@@ -31,7 +33,7 @@ def read_appointments(selected_time=None, available=None):
             User.name.label('coach_name'),
             Appointment.start_time,
             Appointment.student_id
-        ).join(User, User.id == Appointment.coach_id)
+        ).join(User, User.id == Appointment.coach_id).order_by(Appointment.start_time)
 
         if selected_time:
             try:
@@ -45,7 +47,6 @@ def read_appointments(selected_time=None, available=None):
 
         if available is not None:
             if available:
-                print("datetime.now()", datetime.now())
                 query = query.filter(and_(Appointment.student_id.is_(None), Appointment.start_time > datetime.now()))
             else:
                 query = query.filter(Appointment.student_id.isnot(None))
@@ -101,25 +102,57 @@ def create_appointment_review(appointment_id, satisfaction_score, notes):
     except Exception as e:
         db.session.rollback()
         raise ValueError(f"Error creating appointment review: {e}")
-    
+
 def read_appointments_by_coach(coach_id):
     try:
-        appointments = db.session.query(Appointment, AppointmentReview).outerjoin(
-            AppointmentReview, Appointment.id == AppointmentReview.appointment_id
-        ).filter(Appointment.coach_id == coach_id).all()
+        Coach = aliased(User)
+        Student = aliased(User)
         
-        result = []
-        for appointment in appointments:
-            appointment_data = appointment[0].__dict__.copy()
-            appointment_data.pop('_sa_instance_state', None)
-            if appointment[1]:
-                appointment_data['review'] = {
-                    'id': appointment[1].id,
-                    'appointment_id': appointment[1].appointment_id,
-                    'satisfaction_score': appointment[1].satisfaction_score,
-                    'notes': appointment[1].notes
-                }
-            result.append(appointment_data)
+        appointments = db.session.query(
+            Appointment.id.label('id'),
+            Appointment.coach_id.label('coach_id'),
+            Coach.name.label('coach_name'),
+            Coach.phone_number.label('phone_number'),
+            Appointment.start_time.label('start_time'),
+            Appointment.student_id.label('student_id'),
+            Student.name.label('student_name'),
+            func.coalesce(
+                func.json_build_object(
+                    'id', AppointmentReview.id,
+                    'appointment_id', AppointmentReview.appointment_id,
+                    'satisfaction_score', AppointmentReview.satisfaction_score,
+                    'notes', AppointmentReview.notes
+                ),
+                func.json_build_object(
+                    'id', None,
+                    'appointment_id', None,
+                    'satisfaction_score', None,
+                    'notes', None
+                )
+            ).label('review')
+        ).outerjoin(
+            AppointmentReview, Appointment.id == AppointmentReview.appointment_id
+        ).outerjoin(
+            Coach, Coach.id == Appointment.coach_id
+        ).outerjoin(
+            Student, Student.id == Appointment.student_id
+        ).filter(
+            Appointment.coach_id == coach_id
+        ).all()
+
+        result = [
+            {
+                'id': appointment.id,
+                'coach_id': appointment.coach_id,
+                'coach_name': appointment.coach_name,
+                'phone_number': appointment.phone_number,
+                'start_time': appointment.start_time,
+                'student_id': appointment.student_id,
+                'student_name': appointment.student_name,
+                'review': appointment.review
+            }
+            for appointment in appointments
+        ]
         return result
     except Exception as e:
         raise ValueError(f"Error reading appointments for coach {coach_id}: {e}")
@@ -133,6 +166,7 @@ def read_appointments_by_student(student_id):
             User.phone_number,
             Appointment.start_time,
             Appointment.student_id
-        ).join(User, User.id == Appointment.coach_id).filter(and_(Appointment.student_id == student_id, Appointment.start_time > datetime.now())).order_by(Appointment.start_time).all()
+        ).join(User, User.id == Appointment.coach_id).filter(
+            and_(Appointment.student_id == student_id, Appointment.start_time > datetime.now())).order_by(Appointment.start_time).all()
     except Exception as e:
         raise ValueError(f"Error reading appointments for student {student_id}: {e}")
